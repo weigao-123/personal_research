@@ -503,7 +503,7 @@ layout: pageBar
     - **Taylor Series Expansion**:
       $$ f(x) = x_0 + f'(x_0)(x-x_0) + \frac{f''(x_0)}{2!}(x-x_0)^2 + \cdots $$
     - **General Power Series Expansion**:
-      $$ f(x) = a_0 + b_0 x + b_1 x^2 + \cdots $$
+      $$ f(x) = a_0 + a_1 x + a_2 x^2 + \cdots $$
   - Numerical methods use discrete differences for derivatives.
   - SAS uses exact power series representation and so keeps the continuous characteristic of the solution.
 </div>
