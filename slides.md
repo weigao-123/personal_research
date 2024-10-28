@@ -42,7 +42,7 @@ Past
 Research Interest
 - Microgrid control
 - Renewable energy
-- Power system dynamics
+- Power system dynamics and simulation (DAE)
 - Power system stability
 - Power system economics and market
 - Machine learning application in power system
@@ -87,6 +87,469 @@ layout: pageBar
 layout: pageBar
 ---
 
+## Power System Semi Analytical Solution
+
+<br>
+
+<br>
+
+- Computational methods using analytical formulations to approximate solutions.
+  - power series
+  - fraction of power series
+  - continued fractions
+
+<br>
+
+<div class="grid grid-cols-2 gap-4">
+
+<div class="col-span-1">
+
+- Numerical Methods
+  - purely numerical (continuous system to discrete system)
+  - Newton-Raphson for algebraic equations
+    - sensitive to initial guess
+    - failure to converge
+  - Runge-Kutta and Trapezoidal for differential equations
+    - sensitive to time step size
+    - time-consuming with small time step size
+
+</div>
+
+<div class="col-span-1">
+
+- Analytical Methods
+  - partially analytical (explicit power series representation)
+    - explicit symbolic solution
+    - sensitive to truncation order
+  - partially numerical (truncated power series with numerical coefficients)
+    - convergence radius
+    - multi-stage computation
+  - <span class="text-red">robustness and accuracy</span>
+  - <span class="text-red">computational efficiency</span>
+
+</div>
+
+</div>
+
+source: [R. Yao, K. Sun and F. Qiu, "Vectorized Efficient Computation of Padé Approximation for Semi-Analytical Simulation of Large-Scale Power Systems"](https://ieeexplore.ieee.org/document/8717666)
+---
+layout: pageBar
+---
+
+### Solving DAE using power series
+
+<br>
+
+<br>
+
+- **DAE**: 
+  $$ 0 = h \left( \frac{dz(\alpha)}{d\alpha}, z(\alpha), \alpha \right), \quad \alpha \in \mathbb{C}, \, z(0) = z_0 $$
+  
+- **Power Series Solution**:
+  $$ z(\alpha) = \sum_{k=0}^{\infty} z[k] \alpha^k, \quad |\alpha| < R_z $$
+
+- **Convergence**: Series converges within a radius $R_z$.
+
+- **Operation Rules**:
+  | Operation     | Original Form                     | HE Coefficient Form                           |
+  |---------------|-----------------------------------|-----------------------------------------------|
+  | Linear        | $a z(\alpha) + b$                 | $a z[k] + b$                                  |
+  | Multiplication| $z_1(\alpha) \cdots z_m(\alpha)$  | $\sum_{\sum k_i = k} z_1[k_1] \cdots z_m[k_m]$|
+  | Derivative    | $\frac{dz(\alpha)}{d\alpha}$      | $(k + 1) z[k + 1]$                            |
+
+<style scoped>
+.katex {
+  font-size: 0.7em;
+}
+</style>
+---
+layout: pageBar
+---
+
+### Example to solve DAE using power series
+
+<br>
+
+<br>
+
+- DAE:
+  - Differential Equation: 
+  $$ \frac{dz_1(t)}{dt} = 2 z_1(t) z_2(t) + z_1(t) $$
+  - Algebraic Equation: 
+  $$ 0 = z_2(t) + z_1(t) - 1 $$
+
+<div class="grid grid-cols-2 gap-4">
+
+<div class="col-span-1">
+Numerical Scipy Solution
+```python {*}{maxHeight: '300px'}
+import numpy as np
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
+
+# Define the differential equation system
+def dae_system(t, z):
+    z1 = z[0]
+    
+    # Solve for z2 using the algebraic equation
+    z2 = 1 - z1  # Positive root, assuming z1 <= 1
+    
+    # Define the differential equation for z1
+    dz1_dt = 2 * z1 * z2 + z1
+    
+    # Return the derivative
+    return [dz1_dt]
+
+# Define the initial conditions for z1
+z1_0 = 0.5  # Initial condition for z1
+t_span = (0, 1.1)  # Time range, from 0 to 10 seconds
+t_eval = np.linspace(0, 1.1, 100)  # Evaluation points
+
+# Solve the system using SciPy's solve_ivp
+solution = solve_ivp(dae_system, t_span, [z1_0], t_eval=t_eval, method='RK45')
+
+# Extract time points and z1 values from the solution
+t_vals = solution.t
+z1_vals = solution.y[0]
+
+# Compute z2 values using the algebraic equation at each time step
+z2_vals = 1 - z1_vals
+
+# Print results
+print("Time values (t):", t_vals)
+print("z1(t) values:", z1_vals)
+print("z2(t) values:", z2_vals)
+
+# Plotting the results
+plt.plot(t_vals, z1_vals, label="z1(t)")
+plt.plot(t_vals, z2_vals, label="z2(t)")
+plt.xlabel('Time (t)')
+plt.ylabel('Values')
+plt.legend()
+plt.title('Solution of the DAE system over time')
+plt.grid()
+plt.show()
+
+z1_scipy = z1_vals
+z2_scipy = z2_vals
+```
+</div>
+
+<div class="col-span-1">
+
+<Transform :scale="0.75">
+<img src="/pages/dae_scipy.svg"
+alt="Solution of DAE using Scipy">
+</Transform>
+
+</div>
+
+</div>
+
+<style scoped>
+.katex {
+  font-size: 0.7em;
+}
+</style>
+
+---
+layout: pageBar
+---
+
+### Example to solve DAE using power series
+
+<br>
+
+Analytical Power Series Solution
+
+  - Single-stage computation (diverges due to the convergence radius of the truncated power series)
+
+<div class="grid grid-cols-2 gap-4">
+
+<div class="col-span-1">
+
+```python {*}{maxHeight: '400px'}
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Maximum number of coefficients to compute
+K = 100
+
+# Initialize arrays for coefficients z1 and z2
+z1 = [None] * (K + 1)
+z2 = [None] * (K + 1)
+
+# Set initial conditions for k=0
+z1[0] = 0.5
+z2[0] = 1 - z1[0]  # From the algebraic equation
+
+# Kronecker delta function
+def f_delta(i, j):
+    return 1 if i == j else 0
+
+# Calculate coefficients recursively
+for k in range(K):
+    # Update z1[k+1] based on the differential equation
+    z1_sum = sum(z1[i] * z2[k - i] for i in range(k + 1))
+    z1[k + 1] = (2 * z1_sum + z1[k]) / (k + 1)
+
+    # Update z2[k+1] based on the algebraic equation
+    z2[k+1] = f_delta(k+1, 0) - z1[k+1]
+
+# Display results
+# print("z1 coefficients:", z1)
+# print("z2 coefficients:", z2)
+
+t_eval = np.linspace(0, 1.1, 100)  # Evaluation points
+z1_vals = [sum(z1[k] * t**k for k in range(K + 1)) for t in t_eval]
+z2_vals = [sum(z2[k] * t**k for k in range(K + 1)) for t in t_eval]
+
+# Plotting the results
+plt.plot(t_eval, z1_vals, label="z1(t)")
+plt.plot(t_eval, z2_vals, label="z2(t)")
+plt.xlabel("Time (t)")
+plt.ylabel("Values")
+plt.legend()
+plt.title("Solution of the DAE system using SAS single stage")
+plt.grid()
+plt.show()
+
+z1_he = z1_vals
+z2_he = z2_vals
+```
+
+</div>
+
+<div class="col-span-1 row-span-1">
+
+<Transform :scale="1">
+<img src="/pages/dae_sas_single_stage.svg"
+alt="Solution of DAE using SAS single stage">
+</Transform>
+
+</div>
+
+</div>
+
+---
+layout: pageBar
+---
+
+### Example to solve DAE using power series
+
+<br>
+
+Analytical Power Series Solution
+- Multi-stage computation (converges due to the convergence radius of the truncated power series)
+
+<div class="grid grid-cols-2 gap-4">
+
+<div class="col-span-1">
+```python {*}{maxHeight: '400px'}
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Kronecker delta function
+def f_delta(i, j):
+    return 1 if i == j else 0
+
+# Define the DAE system in HE format
+def calculate_coefficients(K, z1_0, z2_0):
+    """
+    Calculate coefficients for z1 and z2 up to order K.
+    """
+    z1 = np.zeros(K + 1)
+    z2 = np.zeros(K + 1)
+
+    # Set initial conditions for k=0
+    z1[0] = z1_0
+    z2[0] = z2_0
+
+    # Recursively calculate coefficients
+    for k in range(K):
+        # Update z1[k+1] based on the differential equation
+        z1_sum = sum(z1[i] * z2[k - i] for i in range(k + 1))
+        z1[k + 1] = (2 * z1_sum + z1[k]) / (k + 1)
+
+        # Update z2[k+1] based on the algebraic equation
+        z2[k+1] = f_delta(k+1, 0) - z1[k+1]
+
+    return z1, z2
+
+# Function to evaluate the series at a given time
+def evaluate_series(z, t, K):
+    return sum(z[k] * t**k for k in range(K + 1))
+
+# Function to calculate imbalance at a given time t
+def calculate_imbalance(z1, z2, t, K):
+    # Evaluate the derivative of z1
+    dz1_dt = sum((k + 1) * z1[k + 1] * t**k for k in range(K))
+    
+    # Evaluate the current values of z1 and z2
+    z1_val = evaluate_series(z1, t, K)
+    z2_val = evaluate_series(z2, t, K)
+    
+    # Calculate the DAE imbalance
+    return abs(dz1_dt - (2 * z1_val * z2_val + z1_val))
+
+# Multi-stage HE implementation
+def multi_stage_HE(total_time, initial_z1, initial_z2, K, error_threshold):
+    stages = []  # Store the results for each stage
+    t = 0.0  # Start time
+
+    # Loop until the entire time range is covered
+    while t < total_time:
+        # Compute the power series coefficients for the current stage
+        z1, z2 = calculate_coefficients(K, initial_z1, initial_z2)
+
+        # Check if the power series solution satisfies the error threshold at total_time
+        if calculate_imbalance(z1, z2, total_time - t, K) < error_threshold:
+            # If it does, evaluate over the entire remaining time interval
+            stage_t_values = np.linspace(t, total_time, 100)
+            stage_z1_values = [evaluate_series(z1, t_i - t, K) for t_i in stage_t_values]
+            stage_z2_values = [evaluate_series(z2, t_i - t, K) for t_i in stage_t_values]
+
+            stages.append((stage_t_values, stage_z1_values, stage_z2_values))
+            break  # Exit the loop as we have covered the total_time
+
+        # If the series does not satisfy the error threshold at total_time, use binary search
+        left, right = t, total_time
+        max_valid_t = t
+
+        while right - left > 1e-3:  # Precision tolerance for binary search
+            # Check the imbalance at the current `right` bound instead of mid-point
+            imbalance = calculate_imbalance(z1, z2, right - t, K)
+
+            if imbalance < error_threshold:
+                max_valid_t = right  # Entire interval is valid
+                break
+            else:
+                right = (left + right) / 2  # Adjust to find a shorter valid interval
+
+        # Append the results for this stage
+        stage_t_values = np.linspace(t, max_valid_t, 100)
+        stage_z1_values = [evaluate_series(z1, t_i - t, K) for t_i in stage_t_values]
+        stage_z2_values = [evaluate_series(z2, t_i - t, K) for t_i in stage_t_values]
+
+        stages.append((stage_t_values, stage_z1_values, stage_z2_values))
+
+        # Update time and initial conditions for the next stage
+        t = max_valid_t
+        initial_z1 = stage_z1_values[-1]
+        initial_z2 = stage_z2_values[-1]
+
+    # Concatenate the stage results
+    t_values = np.concatenate([stage[0] for stage in stages])
+    z1_values = np.concatenate([stage[1] for stage in stages])
+    z2_values = np.concatenate([stage[2] for stage in stages])
+
+    return t_values, z1_values, z2_values
+
+
+# Define constants
+K = 50  # Order of the power series
+error_threshold = 1e-6  # Imbalance error threshold
+total_time = 10  # Total desired simulation time
+
+# Set initial conditions for z1 and z2
+initial_z1 = 0.5
+initial_z2 = 1 - initial_z1
+
+# Solve the DAE using multi-stage HE
+t_values, z1_values, z2_values = multi_stage_HE(total_time, initial_z1, initial_z2, K, error_threshold)
+
+# Plot the results
+plt.plot(t_values, z1_values, label="z1(t)")
+plt.plot(t_values, z2_values, label="z2(t)")
+plt.xlabel("Time (t)")
+plt.ylabel("Values")
+plt.legend()
+plt.title("Solution of the DAE system using Multi-Stage HE")
+plt.grid()
+plt.show()
+```
+</div>
+
+<div class="col-span-1">
+
+<Transform :scale="1">
+<img src="/pages/dae_sas_multi_stage.svg"
+alt="Solution of DAE using SAS multi-stage">
+</Transform>
+
+</div>
+</div>
+
+---
+layout: pageBar
+---
+
+### Observations
+
+<br>
+
+<div class="custom-font-size">
+
+- **<span style="color:red">Question</span>**: Why need to use multi-stage to solve DAE with SAS?
+- **<span style="color:green">Thought</span>**: 
+  - Convergence condition: 
+    $$ |\frac{a_n}{a_{n-1}} x| < 1 $$
+  - Unable to determine the convergence radius without all coefficients.
+  - Use binary search to evaluate if the solution meets the error threshold.
+
+- **<span style="color:red">Question</span>**: How does SAS differ from conventional numerical integration?
+- **<span style="color:green">Thought</span>**: 
+  - Both rely on Taylor Series.
+    - **Taylor Series Expansion**:
+      $$ f(x) = x_0 + f'(x_0)(x-x_0) + \frac{f''(x_0)}{2!}(x-x_0)^2 + \cdots $$
+    - **General Power Series Expansion**:
+      $$ f(x) = a_0 + b_0 x + b_1 x^2 + \cdots $$
+  - Numerical methods use discrete differences for derivatives.
+  - SAS uses exact power series representation and so keeps the continuous characteristic of the solution.
+</div>
+
+<style scoped>
+.katex {
+  font-size: 0.7em;
+}
+.custom-font-size {
+  font-size: 13px;
+}
+</style>
+
+<!-- Question: why we have to use this binary search to check if the solution diverges or not?
+
+Thought: according to the definition of the convergence of the power series, we have
+$$
+|\frac{a_n}{a_{n-1}} x| < 1
+$$
+Ignore the sign, we bascially have $x < \frac{a_{n-1}}{a_n}$, however, in our case, we can not determine the convengence radius until we calculate all the cofficients (which is infinite, impossible), and so we may only use the binary search with evaluation method to check if the solution is in satifisied with the error threshold.
+
+Question: The difference between conventional numerical integration method and SAS?
+
+Thought: Both of them rely on the Taylor Series, we know that Taylor Series could represent any function at a point, however, usually we use the trunced version, but in this case, for some far points, the approximation is not accurate anymore, and the conventional numerical integration methods usually take a small step and approximate the derivtaves by discrite difference. To some degree, this is converting the continus derivate to discrete difference for the application of Taylor Series. However, for SAS, we first write down the exact solution in power series (the general representation of Taylor Series), in which the series cofficients are corresponding to the cofficient of Taylor Series as follows:
+
+Taylor Series expansion on $x_0$ (note, if we use infinite order, this is exact, if only few orders, then only approximation around the point $x_0$)
+$$
+f(x) = x_0 + f'(x_0)(x-x_0) + \frac{f''(x_0)}{2!}(x-x_0)^2 + ... + \frac{f^n(x_0)}{n!}(x-x_0)^n
+$$
+
+General Power Series exapnsion on any point (note, if we use infinite order, this is exact, if only few orders, then only approximation around somepoint):
+$$
+f(x) = a_0 + b_0 x + b_1 x^2 + ... + b_n x^n
+$$
+
+If we match term by term, we could see that the cofficients of the general power series expansion is determined by the taylor series expansion cofficients (the corresponding derivatives).
+
+Thus, in SAS, what it does is actually still trying to approximate the solution in some orders of the series, but not calculate the derivatives (the series cofficients) in the discrete manner, it keeps the original continuous manner through the introduced operation rule with series addition, multiplication, and derivatives, recursively starting from cofficient $a_0$
+
+In this sense, we use the polynomial power series to represent the function and than use the continuous operation rule for derivatives on it, this is computer algebra or symbolic computing; however, to reach our final goal of a simulation with finite resources, we evaluate it up to some orders, this is numerical methods.
+
+To me, this SAS for solving DAE is basically using power series to solve DAE. -->
+---
+layout: pageBar
+---
+
 ## Distributed Energy Resources Management System (DERMS)
 
 <br>
@@ -115,7 +578,7 @@ layout: pageBar
 <br>
 
 - Unbalance and mixture of single-phase and three-phase (multi-phase) in distribution level
-- Linearization of Original nonlinear and nonconvex OPF model in multi-phase system
+- Linearization of original nonlinear and nonconvex OPF model in multi-phase system
 - General and comprehensive devices support by CYME (overhead-lines, transformer, PV, BESS, regulator, capacitor, etc.)
 
 ---
@@ -494,25 +957,50 @@ layout: pageBar
 
 <br>
 
-<br>
-
 - Power system simulation with synchronous generator and IBRs (PV and DFIG) in PSCAD/EMTDC
-
-<br>
-
-<br>
 
 - DRL algorithm in Python with parallel computing in Ray framework
 
-<br>
-
-<br>
-
 - HIL testing with RTDS platform
 
-<br>
+<div class="grid grid-cols-3 gap-4">
+
+<div class="col-span-1">
+
+System Configuration
 
 <br>
+<br>
+<br>
+
+<Transform :scale="1">
+<img src="/two_bus_oos_system.png"
+alt="System Configuration">
+</Transform>
+
+</div>
+
+<div class="col-span-1">
+
+Stable Scenario
+<Transform :scale="1">
+<img src="/oos_protection_stable.png"
+alt="OOS Protection Stable Scenario">
+</Transform>
+
+</div>
+
+<div class="col-span-1">
+
+Unstable Scenario
+<Transform :scale="1">
+<img src="/oos_protection_unstable.png"
+alt="OOS Protection Unstable Scenario">
+</Transform>
+
+</div>
+
+</div>
 
 ---
 layout: pageBar
@@ -711,14 +1199,14 @@ alt="Small signal stability studies of the revised minniWECC system">
 
 </div>
 
-<!-- <div class="col-span-1"> bug for this image, will insert manually
+<div class="col-span-1"> bug for this image, will insert manually
 
 <Transform :scale="0.65">
 <img src="/minniwecc_system.svg"
 alt="Revised minniWECC system with PDCI HVDC transmission">
 </Transform>
 
-</div> -->
+</div>
 
 </div>
 
@@ -728,7 +1216,7 @@ layout: pageBar
 
 ## Result of Revised minniWECC [4]
 
-**Loss of line (left), Single-phase fault (right)**
+**Loss of line, Single-phase fault, Loss of generator, Three-phase fault**
 
 <div class="grid grid-cols-2 gap-4">
 
