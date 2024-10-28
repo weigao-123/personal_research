@@ -151,7 +151,7 @@ layout: pageBar
 - **Convergence**: Series converges within a radius $R_z$.
 
 - **Operation Rules**:
-  | Operation     | Original Form                     | Power Series Coefficient Form                           |
+  | Operation     | Original Form                     | k-th Order Power Series Coefficient Form                           |
   |---------------|-----------------------------------|-----------------------------------------------|
   | Linear        | $a z(\alpha) + b$                 | $a z[k] + b$                                  |
   | Multiplication| $z_1(\alpha) \cdots z_m(\alpha)$  | $\sum_{\sum k_i = k} z_1[k_1] \cdots z_m[k_m]$|
