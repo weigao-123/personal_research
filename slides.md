@@ -151,7 +151,7 @@ layout: pageBar
 - **Convergence**: Series converges within a radius $R_z$.
 
 - **Operation Rules**:
-  | Operation     | Original Form                     | HE Coefficient Form                           |
+  | Operation     | Original Form                     | Power Series Coefficient Form                           |
   |---------------|-----------------------------------|-----------------------------------------------|
   | Linear        | $a z(\alpha) + b$                 | $a z[k] + b$                                  |
   | Multiplication| $z_1(\alpha) \cdots z_m(\alpha)$  | $\sum_{\sum k_i = k} z_1[k_1] \cdots z_m[k_m]$|
@@ -455,7 +455,7 @@ total_time = 10  # Total desired simulation time
 initial_z1 = 0.5
 initial_z2 = 1 - initial_z1
 
-# Solve the DAE using multi-stage HE
+# Solve the DAE using SAS multi-stage
 t_values, z1_values, z2_values = multi_stage_HE(total_time, initial_z1, initial_z2, K, error_threshold)
 
 # Plot the results
@@ -464,7 +464,7 @@ plt.plot(t_values, z2_values, label="z2(t)")
 plt.xlabel("Time (t)")
 plt.ylabel("Values")
 plt.legend()
-plt.title("Solution of the DAE system using Multi-Stage HE")
+plt.title("Solution of the DAE system using SAS multi-stage")
 plt.grid()
 plt.show()
 ```
